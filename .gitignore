@@ -1,0 +1,7 @@
+data/raw/Mendeley_data/
+data/raw/temp/*.parquet
+data/processed/*.parquet
+airflow/logs/*
+airflow/.env
+.google/credentials/gcp.json
+airflow/dags/__pycache__/
