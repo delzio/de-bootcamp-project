@@ -61,7 +61,7 @@ git clone https://github.com/delzio/de-bootcamp-project.git
 
 6. Create or log in to your Google Cloud Platform account
 
-7. Enable the google cloud storage and bigquery APIs (from the hamburger icon in the top left, go to APIs & Services -> Enabled APIs & services)
+7. Enable the compute engine, google cloud storage, and bigquery APIs (from the hamburger icon in the top left, go to APIs & Services -> Enabled APIs & services)
 
 8. Create a new bucket in google cloud storage named what you like (will need to save the name for later)
 
