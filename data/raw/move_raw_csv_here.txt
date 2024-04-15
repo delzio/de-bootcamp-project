@@ -1,0 +1,1 @@
+Download data from https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing, extract the data and save in this folder.

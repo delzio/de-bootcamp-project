@@ -14,53 +14,129 @@ This project will focus specifically on the following columns from the 100_Batch
 - Penicillin concentration(P:g/L): measured concentration of Penicillin product sample (numeric)
 - Batch ID: unique identifier of batch of Penicillin produced (integer)
 - Fault Flag: indifier for any issues during Raman spec measurement (integer)
-- {350:1750}: list of columns with Raman measurement data, the number corresponds to the light wavelength in nm used (numeric)
+- {689-2089}: list of columns with Raman measurement data, the number corresponds to the light wavelength in nm used (numeric)
 
-The goal of this project is to estimate the Penicillin concentration using only the Raman measurement data (from the 350-1750 nm wavelength columns) for each record (sampling point) and compare to the actual measured sample concentration (from the Penicillin concentration(P:g/L) column). The first 50 batches of the dataset will be used to train and test the model that will be used to calculate a Penicillin concentration. Each record from the final 50 batches will be ingested to the cloud in batch using airflow to simulate data being created in near real time. As each record is inserted, the estimated Penicillin concentration will be calculated by feeding the Raman measurement data to the model and the calculated result will be added to the dataset. The final feature data will be used to create a dashboard analyzing the accuracy of the model as well as the distribution of Insulin concentration between both sample measurements and model calculation results.
+The goal of this project is to estimate the Penicillin concentration using only the Raman measurement data (from the 689-2089 nm wavelength columns) for each record (sampling point) and compare to the actual measured sample concentration (from the Penicillin concentration(P:g/L) column). The first 30 batches of the dataset will be used to train and test the model that will be used to calculate a Penicillin concentration. Each record from the final 30 batches will be ingested to the cloud in batch using airflow to simulate data being created in near real time. As each record is inserted, the estimated Penicillin concentration will be calculated by feeding the Raman measurement data to the model and the calculated result will be added to the dataset. The final feature data will be used to create a dashboard analyzing the accuracy of the model as well as the distribution of Insulin concentration between both sample measurements and model calculation results.
 
 ## Project Structure
 The project is organized into the following directories:
 
-0. `SETUP.md`: Contains instructions for setting up requirements on your Linux machine
-1. `src`: Contains source code for the ETL pipeline.
+0. `SETUP.md`: Contains instructions for setting up and running the code
+1. `airflow`: Contains the python scripts used to create DAGs and transfer data to/from Google Cloud
 2. `data`: Stores raw and processed data files.
 3. `model`: Contains all code related to model development (adapted from code originally created by Shashank Gupta, Ricardo Flores, and Rakesh Bobbala - see [Acknowledgements](#acknowledgements) for model development)
 
 ## Requirements
 - Python 3.11
-- SQL Database (e.g., PostgreSQL, MySQL)
-- Pandas library for data manipulation
-- SQLAlchemy library for database interactions
+- Docker + Docker Compose
+- Google Cloud Platform account and project
 
 ## Installation
 1. Clone this repository:
 ```
-git clone https://github.com/yourusername/data-engineering-project.git
+git clone https://github.com/delzio/de-bootcamp-project.git
 ```
 
-2. Install required dependencies:
+2. Install [Docker Engine](https://docs.docker.com/engine/install/)
+
+3. Download the raw data from Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
+
+4. These are all the downloads necesssary, with this you should be good to move on to Usage for more detailed instructions on how to run the project
+
+## Installation and Usage Instructions
+0. It is recommended to run this in a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute and clone this repository into the home directory there
+
+1. Clone this repository:
 ```
-pip install -r requirements.txt
+git clone https://github.com/delzio/de-bootcamp-project.git
 ```
 
-## Usage
-1. Configure database connection details in `config.py`.
-2. Run the ETL pipeline:
-```
-python src/etl_pipeline.py
-```
+2. Install [Docker Engine](https://docs.docker.com/engine/install/)
 
-## Data Sources
-- **Sales Database**: Raw sales data stored in a SQL database.
-- **CSV Files**: Additional sales data stored in CSV files.
+3. Download the raw data from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
+
+4. Move the compressed download file to <path_to_this_project>/data/raw and extract it there (it should create a new folder called Mendeley_data containing the csv files)
+
+5. Raw csv file data must exist in the following path: <path_to_this_project>/data/raw/Mendeley_data/100_Batches_IndPenSim_V3.csv
+
+6. Create or log in to your Google Cloud Platform account
+
+7. Enable the google cloud storage and bigquery APIs (from the hamburger icon in the top left, go to APIs & Services -> Enabled APIs & services)
+
+8. Create a new bucket in google cloud storage named what you like (will need to save the name for later)
+
+9. Create a new dataset in BigQuery named what you like (will need to save the name for later)
+
+10. Set up service account (from the hamburger icon go to IAM & Admin -> Service Accounts)
+
+11. Create Service Account with your desired name and description
+
+12. Recommended to grant just the Owner role but can grant the required specific roles if desired
+
+13. Create the service account
+
+14. Click the service account you created, go to keys, add a key and download as JSON
+
+15. On the Linux VM (or other machine you intend to run this on), use the following commands and copy the contents of your GCP service account json key into the gcp.json file (replace <path_to_this_project> with the path to this git repo you cloned to your machine e.g. ~/de-bootcamp-project/.google/credentials/gcp.json):
+    ```bash
+    cd ~ && mkdir -p <path_to_this_project>/.google/credentials/
+    touch <path_to_this_project>/.google/credentials/gcp.json
+    ```
+
+16. Edit the .env_example file and replace the GCP env var values with the info from your GCP project and save as ".env"
+
+17. Configure airflow user id in .env file by running the following command:
+    ```bash
+    echo "AIRFLOW_UID=$(id -u)" >> .env
+    ```
+
+18. Move into the airflow folder path and start the airflow docker containers with:
+    - docker-compose build
+    - docker-compose up airflow-init
+    - docker-compose up
+
+19. Once the containers have finished launching, the data will immediately start being sent to your GCP GCS bucket and BigQuery dataset
+
+20. If interested, you can view the DAG executions from the Airflow UI at http://localhost:8080/ (you may need to forward port 8080 over to your local computer if running from a VM)
+
+21. You can pause, play, and manually trigger the DAGS from here
+
+22. That's it! The first 30 batches of data should start flowing into your Google Cloud project in a few minutes and the final 70 batches of data will continuously be added via the DAGs until you shut down the containers
+
+23. You can shut down the docker containers with
+    ```bash
+    docker-compose down
+    ```
 
 ## ETL Process
-1. **Extraction**: Retrieve raw data from the sales database and CSV files.
-2. **Transformation**: Clean, standardize, and transform the data into a consistent format.
-3. **Loading**: Load the transformed data into a target database for analysis.
+1. The raw_data_ingestion_gcs_dag is used to extract the data from the raw csv file and store raw data as a series of partitioned parquet files in to the raw path in a GCS Bucket in the first task
+
+2. Once the files are sent to GCS, a second task is initiated which uses a standalone spark cluster to clean, format, and add contextualizers to the raw data from the parquet files and save them as cleaned parquet files to the processed path in a GCS Bucket
+
+3. Once this is completed a third task is initiated to further clean and filter down the contextualized parquet files and saves the data for the first 30 batches worth of data to the T_SAMPLE_CONTEXT and T_RAMAN_CONTEXT BigQuery tables
+
+4. This raw_data_ingestion_gcs_dag is intended to only run once to send the full data as parquet files and backfill the first 30 batches worth of data to the SQL tables
+
+5. In parallel, the processed_to_bq_dag runs every 5 minutes continuously and searches for "new" batches from the processed parquet file data.
+
+6. The first task of this DAG scans about 1-2 batches worth of data from the processed parquet files each time it is executed and further cleans and filters the data to continuously update the T_SAMPLE_CONTEXT and T_RAMAN_CONTEXT BigQuery tables
+
+4. Once this task completes, the second task is triggered which takes the raman context data as input to a Pencillin prediction PLS model and joins the predicted concentration results to the actual sample concentration values from the sample context data.
+
+5. It then sends the joined predicted and actual penicillin data to a new BigQuery table called T_RAMAN_PREDICTION
+
+6. You can join the results from T_RAMAN_PREDICTION to T_SAMPLE_CONTEXT and T_RAMAN_CONTEXT to create a view of all final feature results data
+
+7. The data from these tables was pulled into Google Data Looker Studio to create the [final dashboard for this project](https://lookerstudio.google.com/u/0/reporting/4062f015-268b-4d95-a4a9-8ce517fa9d92/page/5yqwD)
 
 ## Database Schema
-The database schema includes tables for storing transformed sales data, such as `sales`, `customers`, and `products`.
+GCS:
+- Raw Parquet files have all data from the csv file with an added "id" column representing the row number each sample measurement is from
+- Processed Parquet files have only the relevant attribute data and ids with added artificial context columns (sample_ts and batch_number) to simulate real drug processing
+BigQuery:
+- T_SAMPLE_CONTEXT contains cleaned Penicillin sample concentration, ids, and context data from the processed parquet files partitioned by the sample timestamp (sample_ts) and clustered by the batch_number
+- T_RAMAN_CONTEXT contains cleaned raman context data and ids from the processed parquet files partitioned by the sample timestamp (sample_ts)
+- T_RAMAN_PREDICTION contains the final Penicillin actual sample concentration and model-predicted concentration and sample ids
 
 ## Author
 - Jesse Delzio <jmdelzio@ucdavis.edu>
@@ -82,3 +158,45 @@ limitations under the License.
 - This project was inspired by [2024 Data Engineering Zoomcamp](https://datatalks.club/blog/data-engineering-zoomcamp.html) offered by DataTalks.Club.
 - The data used for this project was provided by [kaggle](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
 - The model development for this project was inspired by [Shashank Gupta, Ricardo Flores, and Rakesh Bobbala](https://www.kaggle.com/code/wrecked22/regression-analysis)
+
+## List of useful GCP APIs
+- Compute Engine API
+- Cloud Logging API
+- Analytics Hub API 					
+- Artifact Registry API 					
+- Backup for GKE API 					
+- BigQuery API 					
+- BigQuery Connection API 					
+- BigQuery Data Policy API 					
+- BigQuery Migration API 					
+- BigQuery Reservation API 					
+- BigQuery Storage API 					
+- Cloud Autoscaling API 					
+- Cloud Dataplex API 					
+- Cloud Datastore API 					
+- Cloud Deployment Manager V2 API 					
+- Cloud DNS API 					
+- Cloud Filestore API 					
+- Cloud Monitoring API 					
+- Cloud OS Login API 					
+- Cloud Pub/Sub API 					
+- Cloud Resource Manager API 					
+- Cloud Run Admin API 					
+- Cloud SQL 					
+- Cloud SQL Admin API 					
+- Cloud Storage 					
+- Cloud Storage API 					
+- Cloud Trace API 					
+- Container File System API 					
+- Container Registry API 					
+- Dataform API 					
+- Google Cloud APIs 					
+- Google Cloud Storage JSON API 					
+- IAM Service Account Credentials API 					
+- Identity and Access Management (IAM) API 					
+- Kubernetes Engine API 					
+- Network Connectivity API 					
+- Secret Manager API 					
+- Serverless VPC Access API 					
+- Service Management API 					
+- Service Usage API 

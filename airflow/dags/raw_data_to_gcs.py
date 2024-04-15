@@ -115,8 +115,8 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     logging.info("spark session started")
 
     # pull data from GCS Bucket into spark df, selecting only necessary columns for context
-    logging.info(f'pulling files from: gs://{gcs_bucket}/{gcs_input_path}*')
-    df= spark.read.parquet(f'gs://{gcs_bucket}/{gcs_input_path}*') \
+    logging.info(f'pulling files from: gs://{gcs_bucket}/{gcs_input_path}*.parquet')
+    df= spark.read.parquet(f'gs://{gcs_bucket}/{gcs_input_path}*.parquet') \
         .select(["id","Time (h)"])
     # sort by id, save row count
     df = df.orderBy("id")
