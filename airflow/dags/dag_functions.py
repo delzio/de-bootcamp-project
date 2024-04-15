@@ -230,9 +230,9 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
     logging.info("spark session created")
     
     # find most recent existing record in T_RAMAN_PREDICTION
-    # gather all raman records produced in the last 7 minutes
+    # gather all raman records produced in the last 20 minutes
     current_time = datetime.utcnow()
-    back_time = current_time - timedelta(minutes=7)
+    back_time = current_time - timedelta(minutes=20)
     current_ts = current_time.strftime("%Y-%m-%d %H:%M:%S")
     back_ts = back_time.strftime("%Y-%m-%d %H:%M:%S")
     date_range = (current_ts,back_ts)
@@ -248,11 +248,11 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
                 .collect()[0][0]
         if (most_recent_prediction is None):
             most_recent_prediction = back_time
-            logging.info(f"No existing records found within 7 minutes of current time")
+            logging.info(f"No existing records found within 20 minutes of current time")
         else:
             logging.info(f"Some existing records found - starting after most recent existing time: {most_recent_prediction}: {where_clause}")
     except Exception as e:
-        logging.info(f"No existing records found within 7 minutes of current time")
+        logging.info(f"No existing records found within 20 minutes of current time")
         most_recent_prediction = back_time
     most_recent_ts = most_recent_prediction.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -267,6 +267,17 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
             .select(["id","penicillin_concentration_g_l"]) \
             .where(where_clause)
     logging.info(f"Found sample context data")
+
+    if raman_context_ids.count() == 0:
+        spark.stop()
+        stop_spark_master = "cd $SPARK_HOME && ./sbin/stop-master.sh"
+        stop_spark_worker = "cd $SPARK_HOME && ./sbin/stop-worker.sh"
+        stop_master_process = subprocess.Popen(stop_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stop_master_output, stop_master_error = stop_master_process.communicate()
+        stop_worker_process = subprocess.Popen(stop_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stop_worker_output, stop_worker_error = stop_worker_process.communicate()
+        logging.info("Spark processes stopped")
+        logging.error("No sample context result from the last 20 minutes. No values added to T_RAMAN_PREDICTION.")
     
     # Join to Raman Spectra Data
     # Gather raw data

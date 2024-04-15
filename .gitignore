@@ -5,3 +5,4 @@ airflow/logs/*
 airflow/.env
 .google/credentials/gcp.json
 airflow/dags/__pycache__/
+source/

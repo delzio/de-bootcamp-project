@@ -21,7 +21,7 @@ The goal of this project is to estimate the Penicillin concentration using only 
 ## Project Structure
 The project is organized into the following directories:
 
-0. `SETUP.md`: Contains instructions for setting up and running the code
+0. `README.md`: Contains background and instructions for setting up and running the code
 1. `airflow`: Contains the python scripts used to create DAGs and transfer data to/from Google Cloud
 2. `data`: Stores raw and processed data files.
 3. `model`: Contains all code related to model development (adapted from code originally created by Shashank Gupta, Ricardo Flores, and Rakesh Bobbala - see [Acknowledgements](#acknowledgements) for model development)
@@ -30,18 +30,7 @@ The project is organized into the following directories:
 - Python 3.11
 - Docker + Docker Compose
 - Google Cloud Platform account and project
-
-## Installation
-1. Clone this repository:
-```
-git clone https://github.com/delzio/de-bootcamp-project.git
-```
-
-2. Install [Docker Engine](https://docs.docker.com/engine/install/)
-
-3. Download the raw data from Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
-
-4. These are all the downloads necesssary, with this you should be good to move on to Usage for more detailed instructions on how to run the project
+- Git
 
 ## Installation and Usage Instructions
 0. It is recommended to run this in a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute and clone this repository into the home directory there
@@ -53,7 +42,13 @@ git clone https://github.com/delzio/de-bootcamp-project.git
 
 2. Install [Docker Engine](https://docs.docker.com/engine/install/)
 
-3. Download the raw data from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
+3. Download the raw data from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing). You can use something like the below command to copy from your local computer to VM:
+```
+# Copy archive.zip to the raw folder, unzip it, and remove the old zip file
+scp Downloads/archive.zip <username>@<vm name>:/home/<username>/de-bootcamp-project/data/raw
+unzip archive.zip
+rm archive.zip
+```
 
 4. Move the compressed download file to <path_to_this_project>/data/raw and extract it there (it should create a new folder called Mendeley_data containing the csv files)
 
@@ -87,6 +82,7 @@ git clone https://github.com/delzio/de-bootcamp-project.git
 
 17. Configure airflow user id in .env file by running the following command:
     ```bash
+    cd <path_to_this_project>/airflow/
     echo "AIRFLOW_UID=$(id -u)" >> .env
     ```
 
@@ -94,10 +90,11 @@ git clone https://github.com/delzio/de-bootcamp-project.git
     - docker-compose build
     - docker-compose up airflow-init
     - docker-compose up
+    - (you may need to use "sudo docker compose" instead of "docker-compose")
 
 19. Once the containers have finished launching, the data will immediately start being sent to your GCP GCS bucket and BigQuery dataset
 
-20. If interested, you can view the DAG executions from the Airflow UI at http://localhost:8080/ (you may need to forward port 8080 over to your local computer if running from a VM)
+20. If interested, you can view the DAG executions from the Airflow UI (user: airflow, pw: airflow) at http://localhost:8080/ (you may need to forward port 8080 over to your local computer if running from a VM)
 
 21. You can pause, play, and manually trigger the DAGS from here
 
