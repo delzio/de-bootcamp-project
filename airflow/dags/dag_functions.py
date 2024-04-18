@@ -34,7 +34,7 @@ from chemotools.feature_selection import RangeCut
 from sklearn.preprocessing import StandardScaler
 
 # Send Processed Data to BigQuery
-def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_id, credentials_location, spark_jar_path, full_backfill=False):
+def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_id, credentials_location, spark_jar_path, current_time, full_backfill=False):
     logging.info(f"{project_id},{gcs_bucket},{dataset}")
     # start spark standalone instance with worker
     start_spark_master = "cd $SPARK_HOME && ./sbin/start-master.sh --port 7078"
@@ -86,7 +86,6 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
 
     # find most recent existing record in T_SAMPLE_CONTEXT
     # gather all sample records produced in the last 5 minutes
-    current_time = datetime.utcnow()
     if full_backfill is True:
         back_time = current_time - timedelta(days=2)
     else:
@@ -194,7 +193,7 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
     
 
 # Predict Penicillin Concentration Using PLS Model and send to T_RAMAN_PREDICTION
-def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credentials_location, spark_jar_path, pls_model):
+def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credentials_location, spark_jar_path, pls_model, current_time):
     # start spark standalone instance with worker
     start_spark_master = "cd $SPARK_HOME && ./sbin/start-master.sh --port 7079"
     start_spark_worker = "cd $SPARK_HOME && ./sbin/start-worker.sh spark://127.0.0.1:7079"
@@ -231,8 +230,7 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
     
     # find most recent existing record in T_RAMAN_PREDICTION
     # gather all raman records produced in the last 20 minutes
-    current_time = datetime.utcnow()
-    back_time = current_time - timedelta(minutes=20)
+    back_time = current_time - timedelta(minutes=5)
     current_ts = current_time.strftime("%Y-%m-%d %H:%M:%S")
     back_ts = back_time.strftime("%Y-%m-%d %H:%M:%S")
     date_range = (current_ts,back_ts)
@@ -248,11 +246,11 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
                 .collect()[0][0]
         if (most_recent_prediction is None):
             most_recent_prediction = back_time
-            logging.info(f"No existing records found within 20 minutes of current time")
+            logging.info(f"No existing records found within 5 minutes of execution time")
         else:
             logging.info(f"Some existing records found - starting after most recent existing time: {most_recent_prediction}: {where_clause}")
     except Exception as e:
-        logging.info(f"No existing records found within 20 minutes of current time")
+        logging.info(f"No existing records found within 5 minutes of execution time")
         most_recent_prediction = back_time
     most_recent_ts = most_recent_prediction.strftime("%Y-%m-%d %H:%M:%S")
 

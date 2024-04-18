@@ -54,6 +54,7 @@ gcs_raman_path = "processed/raman_context/"
 spark_jar_path = "/.project/lib/gcs-connector-hadoop3-2.2.5.jar,/.project/lib/spark-3.5-bigquery-0.37.0.jar"
 model_path = "/.project/data/processed/model/raman_pls_model.pk1"
 pls_model = joblib.load(model_path)
+execution_time = datetime.utcnow()
 
 default_args = {
     "owner": "airflow",
@@ -81,7 +82,8 @@ with DAG(
             gcs_sample_path,
             PROJECT_ID,
             CREDENTIALS,
-            spark_jar_path
+            spark_jar_path,
+            execution_time
         ]
     )
 
@@ -95,7 +97,8 @@ with DAG(
             PROJECT_ID,
             CREDENTIALS,
             spark_jar_path,
-            pls_model
+            pls_model,
+            execution_time
         ]
     )
 

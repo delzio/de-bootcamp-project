@@ -46,6 +46,7 @@ gcs_input_path = "raw/"
 gcs_output_path = "processed/sample_context/"
 gcs_raman_path = "processed/raman_context/"
 spark_jar_path = "/.project/lib/gcs-connector-hadoop3-2.2.5.jar,/.project/lib/spark-3.5-bigquery-0.37.0.jar"
+execution_time = datetime.utcnow()
 
 # Functions: 
 # Send raw data as series of parquet files to GCS
@@ -227,6 +228,7 @@ with DAG(
             PROJECT_ID,
             CREDENTIALS,
             spark_jar_path,
+            execution_time,
             True
         ]
     )
