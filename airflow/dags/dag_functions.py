@@ -33,40 +33,28 @@ from chemotools.derivative import NorrisWilliams
 from chemotools.feature_selection import RangeCut
 from sklearn.preprocessing import StandardScaler
 
+def start_spark_session(spark_jar_path, credentials_location):
+    # start spark session from local standalone instance
+    spark = SparkSession.builder \
+        .appName("de_bootcamp_insulin_project") \
+        .master("spark://spark-master:7077") \
+        .config("spark.executor.memory", "4g") \
+        .config("spark.jars", spark_jar_path) \
+        .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
+        .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", credentials_location) \
+        .config("spark.hadoop.fs.AbstractFileSystem.gs.impl",  "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
+        .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
+        .config("spark.hadoop.fs.gs.auth.service.account.json.keyfile", credentials_location) \
+        .config("spark.hadoop.fs.gs.auth.service.account.enable", "true") \
+        .getOrCreate()
+    
+    return spark
+    
+
 # Send Processed Data to BigQuery
 def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_id, credentials_location, spark_jar_path, current_time, full_backfill=False):
-    logging.info(f"{project_id},{gcs_bucket},{dataset}")
-    # start spark standalone instance with worker
-    start_spark_master = "cd $SPARK_HOME && ./sbin/start-master.sh --port 7078"
-    start_spark_worker = "cd $SPARK_HOME && ./sbin/start-worker.sh spark://127.0.0.1:7078"
-    start_master_process = subprocess.Popen(start_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_master_output, start_master_error = start_master_process.communicate()
-    start_worker_process = subprocess.Popen(start_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_worker_output, start_worker_error = start_worker_process.communicate()
-    logging.info("spark master + worker started")
-
-    # define spark configuration
-    conf = SparkConf() \
-        .setMaster("spark://127.0.0.1:7078") \
-        .setAppName("process_raw_data") \
-        .set("spark.jars", spark_jar_path) \
-        .set("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-        .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", credentials_location)
-    logging.info("spark config created")
-
-    # set up spark context
-    sc = SparkContext(conf=conf)
-    hadoop_conf = sc._jsc.hadoopConfiguration()
-    hadoop_conf.set("fs.AbstractFileSystem.gs.impl",  "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    hadoop_conf.set("fs.gs.auth.service.account.json.keyfile", credentials_location)
-    hadoop_conf.set("fs.gs.auth.service.account.enable", "true")
-    logging.info("spark context created")
-
-    # Start Spark session using standalone cluster
-    spark = SparkSession.builder \
-        .config(conf=sc.getConf()) \
-        .getOrCreate()
+    # Start spark session
+    spark = start_spark_session(spark_jar_path=spark_jar_path, credentials_location=credentials_location)
     logging.info("spark session created")
 
     # Gather Data
@@ -85,7 +73,7 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
     logging.info("raman and sample spark dfs created")
 
     # find most recent existing record in T_SAMPLE_CONTEXT
-    # gather all sample records produced in the last 5 minutes
+    # gather all sample records produced in the last 7 minutes (dag will execute every 5, want some overlap)
     if full_backfill is True:
         back_time = current_time - timedelta(days=2)
     else:
@@ -181,51 +169,15 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
         .mode("append") \
         .save()
     
-    # stop spark
+    # stop spark session
     spark.stop()
-    stop_spark_master = "cd $SPARK_HOME && ./sbin/stop-master.sh"
-    stop_spark_worker = "cd $SPARK_HOME && ./sbin/stop-worker.sh"
-    stop_master_process = subprocess.Popen(stop_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_master_output, stop_master_error = stop_master_process.communicate()
-    stop_worker_process = subprocess.Popen(stop_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_worker_output, stop_worker_error = stop_worker_process.communicate()
     logging.info("Spark processes stopped")
     
 
 # Predict Penicillin Concentration Using PLS Model and send to T_RAMAN_PREDICTION
 def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credentials_location, spark_jar_path, pls_model, current_time):
-    # start spark standalone instance with worker
-    start_spark_master = "cd $SPARK_HOME && ./sbin/start-master.sh --port 7079"
-    start_spark_worker = "cd $SPARK_HOME && ./sbin/start-worker.sh spark://127.0.0.1:7079"
-    start_master_process = subprocess.Popen(start_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_master_output, start_master_error = start_master_process.communicate()
-    start_worker_process = subprocess.Popen(start_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_worker_output, start_worker_error = start_worker_process.communicate()
-    logging.info("spark master + worker started")
-
-    # define spark configuration
-    conf = SparkConf() \
-        .setMaster("spark://127.0.0.1:7079") \
-        .setAppName("predict_concentration_data") \
-        .set("spark.jars", spark_jar_path) \
-        .set("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-        .set("spark.executor.memory","4g") \
-        .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", credentials_location)
-    logging.info("spark conf created")
-
-    # set up spark context
-    sc = SparkContext(conf=conf)
-    hadoop_conf = sc._jsc.hadoopConfiguration()
-    hadoop_conf.set("fs.AbstractFileSystem.gs.impl",  "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    hadoop_conf.set("fs.gs.auth.service.account.json.keyfile", credentials_location)
-    hadoop_conf.set("fs.gs.auth.service.account.enable", "true") 
-    logging.info("spark context created")
-
-    # Start Spark session using standalone cluster
-    spark = SparkSession.builder \
-        .config(conf=sc.getConf()) \
-        .getOrCreate()
+    # Start spark session
+    spark = start_spark_session(spark_jar_path=spark_jar_path, credentials_location=credentials_location)
     logging.info("spark session created")
     
     # find most recent existing record in T_RAMAN_PREDICTION
@@ -268,14 +220,8 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
 
     if raman_context_ids.count() == 0:
         spark.stop()
-        stop_spark_master = "cd $SPARK_HOME && ./sbin/stop-master.sh"
-        stop_spark_worker = "cd $SPARK_HOME && ./sbin/stop-worker.sh"
-        stop_master_process = subprocess.Popen(stop_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stop_master_output, stop_master_error = stop_master_process.communicate()
-        stop_worker_process = subprocess.Popen(stop_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        stop_worker_output, stop_worker_error = stop_worker_process.communicate()
-        logging.info("Spark processes stopped")
-        logging.error("No sample context result from the last 20 minutes. No values added to T_RAMAN_PREDICTION.")
+        logging.info("No new sample context result from the last 5 minutes. No values added to T_RAMAN_PREDICTION.")
+        return
     
     # Join to Raman Spectra Data
     # Gather raw data
@@ -342,12 +288,6 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
         .save()
     logging.info(f"Prediction results sent to T_RAMAN_PREDICTION")
     
-    # stop spark
+    # stop spark session
     spark.stop()
-    stop_spark_master = "cd $SPARK_HOME && ./sbin/stop-master.sh"
-    stop_spark_worker = "cd $SPARK_HOME && ./sbin/stop-worker.sh"
-    stop_master_process = subprocess.Popen(stop_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_master_output, stop_master_error = stop_master_process.communicate()
-    stop_worker_process = subprocess.Popen(stop_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_worker_output, stop_worker_error = stop_worker_process.communicate()
     logging.info("Spark processes stopped")

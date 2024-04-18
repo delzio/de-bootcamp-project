@@ -35,7 +35,7 @@ from sklearn.preprocessing import StandardScaler
 # import user defined functions
 HOME = os.environ.get("AIRFLOW_HOME")
 sys.path.append(f"{HOME}/dags")
-from dag_functions import processed_to_bq, pls_prediction_to_bq
+from dag_functions import processed_to_bq, pls_prediction_to_bq, start_spark_session
 
 # Get GCP input data
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")

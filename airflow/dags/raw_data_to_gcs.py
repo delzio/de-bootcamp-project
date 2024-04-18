@@ -29,7 +29,7 @@ import pyspark.sql.types as T
 # import user defined functions
 HOME = os.environ.get("AIRFLOW_HOME")
 sys.path.append(f"{HOME}/dags")
-from dag_functions import processed_to_bq
+from dag_functions import processed_to_bq, start_spark_session
 
 # Get GCP input data
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -81,38 +81,8 @@ def raw_to_gcs(gcs_bucket, gcs_path, local_data_file, local_data_path, temp_path
 # Generate Batch and Sample Time context and send as series of parquet files to GCS
 # NOTE: Can take several minutes depending on internet speed
 def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credentials_location, spark_jar_location):
-    # start spark standalone instance with worker
-    start_spark_master = "cd $SPARK_HOME && ./sbin/start-master.sh --port 7077"
-    start_spark_worker = "cd $SPARK_HOME && ./sbin/start-worker.sh spark://127.0.0.1:7077"
-    start_master_process = subprocess.Popen(start_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_master_output, start_master_error = start_master_process.communicate()
-    logging.info("spark master process created")
-    start_worker_process = subprocess.Popen(start_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    start_worker_output, start_worker_error = start_worker_process.communicate()
-    logging.info("spark worker process created")
-
-    # define spark configuration
-    conf = SparkConf() \
-        .setMaster("spark://127.0.0.1:7077") \
-        .setAppName("process_raw_data") \
-        .set("spark.jars", spark_jar_location) \
-        .set("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-        .set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", credentials_location)
-    logging.info("spark config created")
-
-    # set up spark context
-    sc = SparkContext(conf=conf)
-    hadoop_conf = sc._jsc.hadoopConfiguration()
-    hadoop_conf.set("fs.AbstractFileSystem.gs.impl",  "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-    hadoop_conf.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem")
-    hadoop_conf.set("fs.gs.auth.service.account.json.keyfile", credentials_location)
-    hadoop_conf.set("fs.gs.auth.service.account.enable", "true")
-    logging.info("spark context created")
-
-    # start spark session using standalone cluster
-    spark = SparkSession.builder \
-        .config(conf=sc.getConf()) \
-        .getOrCreate()
+    # Start spark session
+    spark = start_spark_session(spark_jar_path=spark_jar_path, credentials_location=credentials_location)
     logging.info("spark session started")
 
     # pull data from GCS Bucket into spark df, selecting only necessary columns for context
@@ -151,7 +121,7 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     ts_current = datetime.utcnow()
     ts_first_30_batches = [ts_current - i*timedelta(seconds=0.06) for i in range(1,first_new_batch)]
     ts_first_30_batches.reverse()
-    ts_last_70_batches = [ts_current + i*timedelta(seconds=0.06) for i in range(first_new_batch,nrows+1)]
+    ts_last_70_batches = [ts_current + i*timedelta(seconds=0.06) for i in range(1,nrows-first_new_batch+2)]
     sample_ts = ts_first_30_batches
     sample_ts.extend(ts_last_70_batches)
     # join sample ts to processed_df
@@ -161,20 +131,15 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     logging.info("df_batch_context created")
     
     # send batch context df to gcs bucket under processed folder with 4 partitions
+    logging.info(f'sending context data to gs://{gcs_bucket}/{gcs_output_path}')
     df_batch_context \
         .repartition(4) \
         .write.mode('overwrite').parquet(f'gs://{gcs_bucket}/{gcs_output_path}')
 
     logging.info("context data sent to GCS")
     
-    # stop spark
+    # stop spark session
     spark.stop()
-    stop_spark_master = "cd $SPARK_HOME && ./sbin/stop-master.sh"
-    stop_spark_worker = "cd $SPARK_HOME && ./sbin/stop-worker.sh"
-    stop_master_process = subprocess.Popen(stop_spark_master, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_master_output, stop_master_error = stop_master_process.communicate()
-    stop_worker_process = subprocess.Popen(stop_spark_worker, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    stop_worker_output, stop_worker_error = stop_worker_process.communicate()
     logging.info("Spark processes stopped")
 
 default_args = {

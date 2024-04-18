@@ -33,7 +33,7 @@ The project is organized into the following directories:
 - Git
 
 ## Installation and Usage Instructions
-0. It is recommended to run this in a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute and clone this repository into the home directory there
+0. It is recommended to run this in a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute and clone this repository into the home directory there. View [How to SSH into VM section](#how-to-ssh-into-vm) to set up your local machine to log into the virtual machine you created.
 
 1. Clone this repository:
 ```
@@ -94,7 +94,7 @@ rm archive.zip
 
 19. Once the containers have finished launching, the data will immediately start being sent to your GCP GCS bucket and BigQuery dataset
 
-20. If interested, you can view the DAG executions from the Airflow UI (user: airflow, pw: airflow) at http://localhost:8080/ (you may need to forward port 8080 over to your local computer if running from a VM)
+20. If interested, you can view the DAG executions from the Airflow UI (user: airflow, pw: airflow) at http://localhost:8092/ (you may need to forward port 8092 over to your local computer if running from a VM)
 
 21. You can pause, play, and manually trigger the DAGS from here
 
@@ -134,6 +134,27 @@ BigQuery:
 - T_SAMPLE_CONTEXT contains cleaned Penicillin sample concentration, ids, and context data from the processed parquet files partitioned by the sample timestamp (sample_ts) and clustered by the batch_number
 - T_RAMAN_CONTEXT contains cleaned raman context data and ids from the processed parquet files partitioned by the sample timestamp (sample_ts)
 - T_RAMAN_PREDICTION contains the final Penicillin actual sample concentration and model-predicted concentration and sample ids
+
+## How to SSH into VM
+1. Create a directory called .ssh in your local machine home path (~)
+
+2. Create ssh keys from command line: 
+    ```bash
+    ssh-keygen -t rsa -f ~/.ssh/gcp -C USER -b 2048
+    ```
+3. This will create two key files in your ~/.ssh folder, copy the gcp.pub contents to GCP: "compute engine -> settings -> metadata -> ssh keys - copy public key"
+
+4. connect using external ip
+
+5. Create a file called config in ~/.ssh:
+Host <gcp vm name>
+    HostName <gcp vm external ip>
+    User <your username>
+    IdentityFile ~/.ssh/gcp
+
+6. Can log on from your command line using "ssh <gcp vm name>" or from vs code using connect to host and selecting <gcp vm name>
+
+
 
 ## Author
 - Jesse Delzio <jmdelzio@ucdavis.edu>
