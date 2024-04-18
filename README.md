@@ -60,10 +60,8 @@ git clone https://github.com/delzio/de-bootcamp-project.git
 
 3. Download the raw data from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing). You can use something like the below command to copy from your local computer to VM:
 ```
-# Copy archive.zip to the raw folder, unzip it, and remove the old zip file
+# Copy archive.zip to the raw folder, unzip it, and remove the old zip file (this may take a few tries but should work)
 scp Downloads/archive.zip <username>@<vm name>:/home/<username>/de-bootcamp-project/data/raw
-unzip archive.zip
-rm archive.zip
 ```
 
 4. Move the compressed download file to <path_to_this_project>/data/raw and extract it there (it should create a new folder called Mendeley_data containing the csv files)
@@ -94,7 +92,7 @@ rm archive.zip
     touch <path_to_this_project>/.google/credentials/gcp.json
     ```
 
-16. Edit the .env_example file and replace the GCP env var values with the info from your GCP project and save as ".env"
+16. Move to the airflow folder and edit the .env_example file and replace the GCP env var values with the info from your GCP project and save as ".env" (make sure there are no added spaces in the variable names)
 
 17. Configure airflow user id in .env file by running the following command:
     ```bash
@@ -120,6 +118,8 @@ rm archive.zip
     ```bash
     docker-compose down
     ```
+
+24. If you have any issues, you can open the Airflow UI and click on the dag tasks and check the logs to see error messages (most likely it is due to an incorrectly named environment parameter or missing credentials json)
 
 ## ETL Process
 1. The raw_data_ingestion_gcs_dag is used to extract the data from the raw csv file and store raw data as a series of partitioned parquet files in to the raw path in a GCS Bucket in the first task
