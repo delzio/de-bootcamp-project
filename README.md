@@ -3,6 +3,22 @@
 ## Introduction
 This project uses the techniques learned throughout participation in the DataTalks.Club 2024 data engineering zoomcamp course to extract, transform, and load data from the large-scale manufacturing of Insulin into a dashboard for analysis. 
 
+Project Evaluation Criteria Notes:
+
+Problem Description can be found throughout this README in the [Background](#background), [Project Description](#project-description), [ETL Process](#etl-process), and [Database Schema](#database-schema) sections
+
+Google Cloud Platform was used to develop this project
+
+Data Ingestion was performed using batch pipelines consististing of two dags which run in parallel each with multiple tasks uploading to GCS buckets and BigQuery tables (view [ETL Process](#etl-process))
+
+Biquery was used for data warehousing processed data and table partitioning and clustering was applied to multiple tables (view [Database Schema](#database-schema))
+
+Complex data transformations were performed using Spark
+
+The final data analysis dashboard is can be found here: [https://lookerstudio.google.com/u/0/reporting/ce52f512-fd15-4ed5-8637-fc065f89c0c8/page/fRIxD](https://lookerstudio.google.com/u/0/reporting/ce52f512-fd15-4ed5-8637-fc065f89c0c8/page/fRIxD)
+
+This project should be fully reproduceable through docker using the [Installation and Usage Instructions](#installation-and-usage-instructions) (it is recommended to follow these instructions using a VM hosted by GCP)
+
 ## Background
 Insulin is a vital protein product used in the treatment of diabetes. It is produced by growing living cells which have been genetically engineered to produce the Insulin protein and is later purified from these cells and all other impurities. To understand the amount of Insulin produced, samples are typically taken at several intervals throughout the manufacturing process. This sampling is invasive, leading to delays in manufacturing and increased risk of contaminations. Raman spectroscopy is a powerful analytical technique which can be used to analyze the composition of biological components in solution. It is becoming popular in biopharmaceutical production since it is non-invasive and allows for measurements to be taken in process thereby eliminating the need for sampling. This technique relies on measuring the spectrum of light scattered through a solution to measure protein concentration and quality attributes. 
 
@@ -124,7 +140,7 @@ rm archive.zip
 
 6. You can join the results from T_RAMAN_PREDICTION to T_SAMPLE_CONTEXT and T_RAMAN_CONTEXT to create a view of all final feature results data
 
-7. The data from these tables was pulled into Google Data Looker Studio to create the [final dashboard for this project](https://lookerstudio.google.com/u/0/reporting/4062f015-268b-4d95-a4a9-8ce517fa9d92/page/5yqwD)
+7. The data from these tables was pulled into Google Data Looker Studio to create the [final dashboard for this project](https://lookerstudio.google.com/u/0/reporting/ce52f512-fd15-4ed5-8637-fc065f89c0c8/page/fRIxD)
 
 ## Database Schema
 GCS:
