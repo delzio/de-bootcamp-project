@@ -1,4 +1,4 @@
-FROM apache/airflow:2.8.4-python3.11
+FROM apache/airflow:2.9.2-python3.12
 
 # Set environment variables
 ENV AIRFLOW_HOME=/opt/airflow
@@ -16,10 +16,10 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Set env variables for Spark
-ENV SPARK_VERSION=3.5.1
+ENV SPARK_VERSION=3.5.2
 ENV HADOOP_VERSION=3
 
-# Install JDK
+# Install JDK for Spark
 RUN mkdir -p /opt/spark
 RUN wget -q https://download.java.net/java/GA/jdk11/9/GPL/openjdk-11.0.2_linux-x64_bin.tar.gz && \
     tar -xzf openjdk-11.0.2_linux-x64_bin.tar.gz && \
@@ -61,7 +61,7 @@ RUN DOWNLOAD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/goo
 WORKDIR $AIRFLOW_HOME
 
 # Copy and set permissions for scripts
-COPY scripts scripts
-RUN chmod +x scripts
+#COPY scripts scripts
+#RUN chmod +x scripts
 
 USER $AIRFLOW_UID

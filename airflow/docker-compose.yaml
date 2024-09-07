@@ -287,7 +287,7 @@ services:
         condition: service_completed_successfully
 
   spark-master:
-    image: bitnami/spark:3.5.1
+    image: bitnami/spark:3.5.2
     ports: 
       - "8090:8080"
       - "7077:7077"
@@ -308,7 +308,7 @@ services:
     - ${PROJECT_PATH}/lib/:/.project/lib/
     
   spark-worker:
-    image: bitnami/spark:3.5.1
+    image: bitnami/spark:3.5.2
     environment:
       - SPARK_MODE=worker
       - SPARK_MASTER_URL=spark://spark-master:7077
