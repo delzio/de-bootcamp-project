@@ -45,7 +45,7 @@ with DAG(
 ) as dag:
 
     t1 = PythonOperator(
-        task_id='processed_to_bq_task',
+        task_id='process_recent_raman_results',
         python_callable=processed_to_bq,
         op_args=[
             BUCKET,
@@ -60,7 +60,7 @@ with DAG(
     )
 
     t2 = PythonOperator(
-        task_id='pls_prediction_to_bq_task',
+        task_id='predict_recent_sample_concentrations',
         python_callable=pls_prediction_to_bq,
         op_args=[
             BUCKET,

@@ -18,6 +18,7 @@ from chemotools.derivative import NorrisWilliams
 from chemotools.feature_selection import RangeCut
 from sklearn.preprocessing import StandardScaler
 
+# Create Local Spark Session
 def start_spark_session(spark_jar_path, credentials_location):
     # start spark session from local standalone instance
     spark = SparkSession.builder \
@@ -35,14 +36,14 @@ def start_spark_session(spark_jar_path, credentials_location):
     
     return spark
 
-# Send raw data as series of parquet files to GCS
+# Move full raw dataset to GCS as series of parquet files
 # NOTE: Can take several minutes depending on internet speed
 def raw_to_gcs(gcs_bucket, gcs_path, local_data_file, local_data_path, temp_path):
     logging.info(f"{gcs_bucket}")
     chunk_size = 10000
     next_id = 1
 
-    # Loop through csv and send chunks of data as parquet files to gcs
+    # CSV file data is large. Send chunks of data as parquet files to gcs
     for chunk in pd.read_csv(local_data_path+local_data_file, sep=",", chunksize=chunk_size):
         # add unique id to data records
         nrow = chunk.shape[0]
@@ -62,16 +63,16 @@ def raw_to_gcs(gcs_bucket, gcs_path, local_data_file, local_data_path, temp_path
         logging.info(f"Chunk starting at row {ids[0]} sent to GCS bucket")
 
         # set next id
-        next_id = ids[len(ids)-1] + 1
+        next_id = ids[-1] + 1
 
-# Generate Batch and Sample Time context and send as series of parquet files to GCS
+# Raw data does not have batch context identifiers. Generate Batch and Sample Time context and send as series of parquet files to GCS
 # NOTE: Can take several minutes depending on internet speed
 def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credentials_location, spark_jar_path):
     # Start spark session
     spark = start_spark_session(spark_jar_path=spark_jar_path, credentials_location=credentials_location)
     logging.info("spark session started")
 
-    # pull data from GCS Bucket into spark df, selecting only necessary columns for context
+    # pull raw data from GCS Bucket into spark df, selecting only necessary columns for context
     logging.info(f'pulling files from: gs://{gcs_bucket}/{gcs_input_path}*.parquet')
     df= spark.read.parquet(f'gs://{gcs_bucket}/{gcs_input_path}*.parquet') \
         .select(["id","Time (h)"])
@@ -80,7 +81,7 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     nrows = df.count()
     logging.info("data read from gcs")
 
-    # Find new batch start indeces
+    # Find new batch start indeces and add batch number identifier
     batch_start_df = df \
         .filter(df["Time (h)"] == 0.2) \
         .select("id") \
@@ -89,9 +90,9 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     # Add next batch id for join clause
     window_frame = Window.orderBy("batch_start_id")
     batch_start_df = batch_start_df.withColumn("next_batch_start_id", F.lead("batch_start_id").over(window_frame))
-    # fill final next_batch_start_id with nrow df_sorted + 1
+    # final next_batch_start_id does not exist so need to fill value above final record id
     batch_start_df = batch_start_df.fillna(nrows+1)
-    # join batch number context to df
+    # join batch number context to raw data df
     df_processed = df.join(batch_start_df, (df.id >= batch_start_df.batch_start_id) & (df.id < batch_start_df.next_batch_start_id ), "inner") \
         .drop(*["batch_start_id","next_batch_start_id"])
     logging.info("df_processed created")
@@ -107,7 +108,7 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     ts_current = datetime.utcnow()
     ts_first_30_batches = [ts_current - i*timedelta(seconds=0.06) for i in range(1,first_new_batch)]
     ts_first_30_batches.reverse()
-    ts_last_70_batches = [ts_current + i*timedelta(seconds=0.06) for i in range(1,nrows-first_new_batch+2)]
+    ts_last_70_batches = [ts_current + i*timedelta(seconds=0.06) for i in range(nrows-first_new_batch+1)]
     sample_ts = ts_first_30_batches
     sample_ts.extend(ts_last_70_batches)
     # join sample ts to processed_df
@@ -129,7 +130,7 @@ def batch_context_to_gcs(gcs_bucket, gcs_input_path, gcs_output_path, credential
     logging.info("Spark processes stopped")
     
 
-# Send Processed Data to BigQuery
+# This function simulates tracing the raw sample and raman data as they are "created" (based on sample_ts) into processed data tables in BigQuery
 def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_id, credentials_location, spark_jar_path, current_time, full_backfill=False):
     # Start spark session
     spark = start_spark_session(spark_jar_path=spark_jar_path, credentials_location=credentials_location)
@@ -151,7 +152,8 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
     logging.info("raman and sample spark dfs created")
 
     # find most recent existing record in T_SAMPLE_CONTEXT
-    # gather all sample records produced in the last 7 minutes (dag will execute every 5, want some overlap)
+    # if full_backfill is False: gather all sample records produced in the last 7 minutes (dag will execute every 5, want some overlap)
+    # if full_backfill is True: gather all sample records produced in the last 2 days (this should be executed once at initial deployment to backfill the first 30 batches)
     if full_backfill is True:
         back_time = current_time - timedelta(days=2)
     else:
@@ -181,6 +183,7 @@ def processed_to_bq(gcs_bucket, dataset, gcs_raw_path, gcs_sample_path, project_
 
     # gather new data that has not been traced into T_SAMPLE_CONTEXT
     date_range = (current_ts,most_recent_ts)
+    where_clause = """sample_ts BETWEEN TO_TIMESTAMP('{1}','yyyy-MM-dd HH:mm:ss') AND TO_TIMESTAMP('{0}','yyyy-MM-dd HH:mm:ss')""".format(*date_range)
     df_context = df_context.select(["id","Batch Number","sample_ts"]) \
         .where(where_clause) \
         .withColumnRenamed("Batch Number","batch_number")
@@ -314,31 +317,24 @@ def pls_prediction_to_bq(gcs_bucket, dataset, gcs_raw_path, project_id, credenti
     # join to raman_context_ids to filter out old data
     df_raman_new = df_raman.join(raman_context_ids, df_raman.id_raman == raman_context_ids.id, "inner").drop("id_raman")
     logging.info(f"Joined raman measurement data to sample context")
-    # Convert to Pandas for modeling
+    # After filtering down data using Spark, need to convert to Pandas for modeling
     df_raman_predict = df_raman_new.toPandas()
     logging.info(f"Created modeling df in pandas")
 
-    # Calculate Derivative
-    df_raman_spectra = df_raman_predict.copy()
-    df_raman_test = df_raman_spectra
-    df_raman_test.drop("id", axis=1, inplace=True)
-    df_raman_test.drop("penicillin_concentration_g_l", axis=1, inplace=True)
-    rcbw = RangeCut(0, df_raman_test.shape[1])
-    data = rcbw.fit_transform(df_raman_test)
-    raman_df = pd.DataFrame(data)
+    # Perform data pre-processing
+    df_raman_preprocessed = df_raman_predict[[col for col in df_raman_predict.columns if col not in ["id","penicillin_concentration_g_l"]]]
     lc = LinearCorrection()
-    spectra_baseline = lc.fit_transform(raman_df)
+    df_raman_preprocessed = lc.fit_transform(df_raman_preprocessed)
     sgf = SavitzkyGolayFilter(window_size=15, polynomial_order=2)
-    spectra_norm = sgf.fit_transform(spectra_baseline)
+    df_raman_preprocessed = sgf.fit_transform(df_raman_preprocessed)
     nw = NorrisWilliams(window_size=15, gap_size=3, derivative_order=1)
-    spectra_derivative = pd.DataFrame(nw.fit_transform(spectra_norm))
+    df_raman_preprocessed = pd.DataFrame(nw.fit_transform(df_raman_preprocessed))
     logging.info(f"Calculated spectra derivative")
 
-    # Create PLS Model
-    x = spectra_derivative
+    # Apply model to predict penicillin concentration
     scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(x)
-    predicted_concentration = pls_model.predict(x_scaled)
+    df_raman_preprocessed = scaler.fit_transform(df_raman_preprocessed)
+    predicted_concentration = pls_model.predict(df_raman_preprocessed)
     logging.info(f"Calculated penicillin concentration predictions")
 
     # Join to sample measurement data
