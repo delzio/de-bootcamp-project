@@ -8,3 +8,10 @@ airflow/dags/__pycache__/
 source/
 .venv/
 src.
+terraform/keys/*.json
+terraform/variables.tf
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/**.terraform
+terraform/**.terraform.lock.*
+

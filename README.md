@@ -56,7 +56,7 @@ The project is organized into the following directories:
 git clone https://github.com/delzio/de-bootcamp-project.git
 ```
 
-2. Install [Docker Engine](https://docs.docker.com/engine/install/)
+2. Install [Docker Engine](https://docs.docker.com/engine/install/) and [Terraform](https://developer.hashicorp.com/terraform/install)
 
 3. Download the raw data from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing). You can use something like the below command to copy from your local computer to VM:
 ```
@@ -72,25 +72,25 @@ scp Downloads/archive.zip <username>@<vm name>:/home/<username>/de-bootcamp-proj
 
 7. Enable the compute engine, google cloud storage, and bigquery APIs (from the hamburger icon in the top left, go to APIs & Services -> Enabled APIs & services)
 
-8. Create a new bucket in google cloud storage named what you like (will need to save the name for later)
+8. Set up service account (from the hamburger icon go to IAM & Admin -> Service Accounts)
 
-9. Create a new dataset in BigQuery named what you like (will need to save the name for later)
+9. Create Service Account with your desired name and description
 
-10. Set up service account (from the hamburger icon go to IAM & Admin -> Service Accounts)
+10. Recommended to grant just the Owner role but can grant the required specific roles if desired
 
-11. Create Service Account with your desired name and description
+11. Create the service account
 
-12. Recommended to grant just the Owner role but can grant the required specific roles if desired
+12. Click the service account you created, go to keys, add a key and download as JSON
 
-13. Create the service account
-
-14. Click the service account you created, go to keys, add a key and download as JSON
-
-15. On the Linux VM (or other machine you intend to run this on), use the following commands and copy the contents of your GCP service account json key into the gcp.json file (replace <path_to_this_project> with the path to this git repo you cloned to your machine e.g. ~/de-bootcamp-project/.google/credentials/gcp.json):
+13. On the Linux VM (or other machine you intend to run this on), use the following commands and copy the contents of your GCP service account json key into the gcp.json file (replace <path_to_this_project> with the path to this git repo you cloned to your machine e.g. ~/de-bootcamp-project/.google/credentials/gcp.json):
     ```bash
     cd ~ && mkdir -p <path_to_this_project>/.google/credentials/
     touch <path_to_this_project>/.google/credentials/gcp.json
     ```
+
+14. Create a new bucket in google cloud storage named what you like (will need to save the name for later)
+
+15. Create a new dataset in BigQuery named what you like (will need to save the name for later)
 
 16. Move to the airflow folder and edit the .env_example file and replace the GCP env var values with the info from your GCP project and save as ".env" (make sure there are no added spaces in the variable names)
 
