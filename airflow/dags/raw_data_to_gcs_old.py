@@ -1,15 +1,23 @@
 # Source libraries
 import os
 import sys
-from datetime import datetime
+import logging
+from datetime import datetime, timedelta
+import pandas as pd
 # pip install apache-airflow
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from airflow.operators import BashOperator
+# pip install google-cloud-storage
+from google.cloud import storage
+# pip install pyspark
+import pyspark
+from pyspark.sql import Row
+from pyspark.sql.window import Window
+import pyspark.sql.functions as F
 # import user defined functions
 HOME = os.environ.get("AIRFLOW_HOME")
 sys.path.append(f"{HOME}/dags")
-from airflow.dags.dag_functions_old import raw_to_gcs
+from airflow.dags.dag_functions_old import processed_to_bq, raw_to_gcs, batch_context_to_gcs
 
 # Get GCP input data
 PROJECT_ID = os.environ.get("GCP_PROJECT_ID")
@@ -24,7 +32,7 @@ local_data_file = "100_Batches_IndPenSim_V3.csv"
 gcs_input_path = "raw/"
 gcs_output_path = "processed/sample_context/"
 #spark_jar_path = "/.project/lib/gcs-connector-hadoop3-2.2.5.jar,/.project/lib/spark-3.5-bigquery-0.37.0.jar"
-execution_time = datetime.utcnow().isoformat()
+execution_time = datetime.utcnow()
 
 default_args = {
     "owner": "airflow",
@@ -54,38 +62,32 @@ with DAG(
         ]
     )
 
-    batch_context_job = f"""
-        gcloud dataproc jobs submit pyspark \
-            --cluster=spark-cluster \
-            gs://{BUCKET}/pyspark_code/batch_context_to_gcs.py \
-            -- \
-                --gcs_bucket={BUCKET}
-                --gcs_input_path={gcs_input_path}
-                --gcs_output_path={gcs_output_path}
-    """
-    
-    t2 = BashOperator(
-        task_id='add_batch_context_spark',
-        bash_command=batch_context_job
+    t2 = PythonOperator(
+        task_id='batch_context_to_gcs_task',
+        python_callable=batch_context_to_gcs,
+        op_args=[
+            BUCKET,
+            gcs_input_path,
+            gcs_output_path,
+            CREDENTIALS,
+            spark_jar_path
+        ]
     )
 
-    backfill_30_batches_job = f"""
-        gcloud dataproc jobs submit pyspark \
-            --cluster=spark-cluster \
-            gs://{BUCKET}/pyspark_code/processed_to_bq.py \
-            -- \
-                --gcs_bucket={BUCKET}
-                --dataset={DATASET}
-                --gcs_raw_path={gcs_input_path}
-                --gcs_sample_path={gcs_output_path}
-                --project_id={PROJECT_ID}
-                --current_time={execution_time}
-                --full_backfill={True}
-    """
-    
-    t3 = BashOperator(
-        task_id='backfill_30_batches_spark',
-        bash_command=backfill_30_batches_job
+    t3 = PythonOperator(
+        task_id='backfill_initial_30_batches',
+        python_callable=processed_to_bq,
+        op_args=[
+            BUCKET,
+            DATASET,
+            gcs_input_path,
+            gcs_output_path,
+            PROJECT_ID,
+            CREDENTIALS,
+            spark_jar_path,
+            execution_time,
+            True
+        ]
     )
 
     t1 >> t2 >> t3
