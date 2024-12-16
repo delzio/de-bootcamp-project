@@ -67,11 +67,11 @@ The project is organized into the following directories:
  - Cloud Storage API
  - BigQuery API
 
-2. Create a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute. View [How to SSH into VM section](#how-to-ssh-into-vm) to set up your local machine to log into the virtual machine you created.
+2. Create a Service Account with your desired name and description (from the hamburger icon go to IAM & Admin -> Service Accounts)
 
-3. Create a Service Account with your desired name and description (from the hamburger icon go to IAM & Admin -> Service Accounts)
+3. Recommended to simply grant Owner role to the service account but can grant the minimum required specific roles if desired for extra security
 
-4. Recommended to simply grant Owner role to the service account but can grant the minimum required specific roles if desired for extra security
+4. Go to Compute Engine, create a new VM isntance, create a Debian e2-standard-4 virtual machine, update the boot disk size to 100GB in the OS and Storage section, update the service account to the one you just created and set the access scopes to "Allow full access to all Cloud APIs" in the security section. View [How to SSH into VM section](#how-to-ssh-into-vm) to set up your local machine to log into the virtual machine you created.
 
 5. Once the service account is created, click on it, go to keys, add a key and download as JSON 
 
