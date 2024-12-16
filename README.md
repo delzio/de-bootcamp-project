@@ -22,10 +22,12 @@ Looker Studio was used to create the visualization dashboard
 This project should be fully reproduceable through docker using the [Installation and Usage Instructions](#installation-and-usage-instructions) (it is recommended to follow these instructions using a VM hosted by GCP)
 
 ## Data Architecture
-![de-zoomcamp-project drawio](https://github.com/user-attachments/assets/4cecfd06-0444-4196-b161-4b65b5fe5ab4)
+![de-zoomcamp-project drawio](https://github.com/user-attachments/assets/e5fdbded-1c00-4219-978f-c5a11338221d)
+
 
 ## Data Visualization
-![RamanModelingDashboard](https://github.com/user-attachments/assets/0fcd25c8-3bc4-4a50-acee-85fe9e7725ef)
+![RamanModelingDashboard](https://github.com/user-attachments/assets/b0109c0d-ebd5-411a-b07f-53e78bb1e691)
+
 
 
 ## Background
