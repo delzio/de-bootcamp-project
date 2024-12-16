@@ -1,0 +1,10 @@
+apache-airflow-providers-google
+pyarrow
+datetime
+pandas
+google-cloud-storage
+google-cloud-bigquery
+pyspark
+joblib
+scikit-learn
+chemotools
