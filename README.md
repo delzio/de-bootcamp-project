@@ -121,7 +121,7 @@ scp Downloads/archive.zip <username>@<vm name>:/home/<username>/de-bootcamp-proj
 14. Unzip the raw data file, and remove the old zip file from data/raw directory in your virtual machine
 ```bash
 # unzip is a linux library that should be installed from the 0_install_software.sh script
-unzip file.zip
+unzip archive.zip
 rm archive.zip
 ```
 
