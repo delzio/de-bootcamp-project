@@ -6,6 +6,7 @@ import pandas as pd
 import requests
 from requests.auth import HTTPBasicAuth
 import pytz
+from tempfile import TemporaryFile
 # pip install google-cloud-storage
 from google.cloud import storage
 # pip install pyspark
@@ -20,6 +21,7 @@ from chemotools.smooth import SavitzkyGolayFilter
 from chemotools.derivative import NorrisWilliams
 from chemotools.feature_selection import RangeCut
 from sklearn.preprocessing import StandardScaler
+import joblib
 
 class DagFunctions:
     '''
@@ -33,36 +35,26 @@ class DagFunctions:
     :pls_prediction_to_bq: predicts penicillin concentration by applying the PLS model to the processed data and sends results to BigQuery table T_RAMAN_PREDICTION
     '''
 
-    def __init__(self, credentials_location: str, spark_jar_path: str):
-        self.credentials_location = credentials_location
-        self.spark_jar_path = spark_jar_path
 
-
-    def start_spark_session(self):
-        '''Starts spark session from local standalone instance'''
+    @staticmethod
+    def start_spark_session():
+        '''Start spark session from GCP Dataproc cluster instance'''
         spark = SparkSession.builder \
             .appName("de_bootcamp_insulin_project") \
-            .master("spark://spark-master:7077") \
-            .config("spark.executor.memory", "4g") \
-            .config("spark.jars", self.spark_jar_path) \
-            .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
-            .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", self.credentials_location) \
-            .config("spark.hadoop.fs.AbstractFileSystem.gs.impl",  "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
-            .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
-            .config("spark.hadoop.fs.gs.auth.service.account.json.keyfile", self.credentials_location) \
-            .config("spark.hadoop.fs.gs.auth.service.account.enable", "true") \
             .getOrCreate()
         
         return spark
 
 
-    def get_dag_status(self, dag_id: str, task_id: str, last_n_hours: int):
+    @staticmethod
+    def get_dag_status(dag_id: str, task_id: str, last_n_hours: int):
         '''
         Gets the status of the most recent run of the specified dag task and returns error if status != "Success"
         :param dag_id: airflow dag id containing task of interest
         :param task_id: airflow task id to get status of
         :param last_n_hours: integer defining lookback time in hours to search for task status within
         '''
+
         # Airflow web server URL and endpoint
         airflow_url = 'http://airflow-webserver:8080/api/v1'
 
@@ -89,7 +81,8 @@ class DagFunctions:
             raise ValueError(f"No prior execution of {task_id}")
 
 
-    def raw_to_gcs(self, gcs_bucket: str, gcs_path: str, local_data_file: str, local_data_path: str, temp_path: str):
+    @staticmethod
+    def raw_to_gcs(gcs_bucket: str, gcs_path: str, local_data_file: str, local_data_path: str, temp_path: str):
         '''
         Moves full raw dataset to GCS as series of parquet files
         NOTE: Can take several minutes depending on internet speed
@@ -99,6 +92,7 @@ class DagFunctions:
         :param local_data_path: local path to source data file
         :param temp_path: local temporary path to save temporary files to
         '''
+
         logging.info(f"{gcs_bucket}")
         chunk_size = 10000
         next_id = 1
@@ -126,7 +120,8 @@ class DagFunctions:
             next_id = ids[-1] + 1
 
 
-    def batch_context_to_gcs(self, gcs_bucket: str, gcs_input_path: str, gcs_output_path: str):
+    @staticmethod
+    def batch_context_to_gcs(gcs_bucket: str, gcs_input_path: str, gcs_output_path: str):
         '''
         Generates batch number and sample time contextualizing data from raw data and sends as series of parquet files to GCS using Spark
         NOTE: Can take several minutes depending on internet speed
@@ -135,7 +130,7 @@ class DagFunctions:
         :param gcs_output_path: GCS bucket storage path of contextualizing data output
         '''
         # Start spark session
-        spark = self.start_spark_session()
+        spark = DagFunctions.start_spark_session()
         logging.info("spark session started")
 
         # pull raw data from GCS Bucket into spark df, selecting only necessary columns for context
@@ -196,7 +191,8 @@ class DagFunctions:
         logging.info("Spark processes stopped")
     
 
-    def processed_to_bq(self, gcs_bucket: str, dataset: str, gcs_raw_path: str, gcs_sample_path: str, project_id: str, current_time: datetime, full_backfill: bool = False):
+    @staticmethod
+    def processed_to_bq(gcs_bucket: str, dataset: str, gcs_raw_path: str, gcs_sample_path: str, project_id: str, current_time: datetime, full_backfill: bool = False):
         '''
         Simulates tracing the raw sample and raman data as they are "created" (based on sample_ts) into processed data tables in BigQuery using Spark
         :param gcs_bucket: name of GCS bucket
@@ -208,7 +204,7 @@ class DagFunctions:
         :full_backfill: backfills all 30 batches "created" prior to dag run if true, backfills batches "created" within last 7 minutes of current_time if false
         '''
         # Start spark session
-        spark = self.start_spark_session()
+        spark = DagFunctions.start_spark_session()
         logging.info("spark session created")
 
         # Gather Data
@@ -330,21 +326,23 @@ class DagFunctions:
         logging.info("Spark processes stopped")
     
 
-    def pls_prediction_to_bq(self, gcs_bucket: str, dataset: str, gcs_raw_path: str, project_id: str, pls_model: str, current_time: datetime):
+    @staticmethod
+    def pls_prediction_to_bq(gcs_bucket: str, dataset: str, gcs_raw_path: str, project_id: str, pls_model_path: str, current_time: datetime):
         '''
         Predicts penicillin concentration using the trained PLS model and sends results to BigQuery table T_RAMAN_PREDICTION using Spark
         :param gcs_bucket: name of GCS bucket
         :param dataset: name of BigQuery dataset
         :param gcs_raw_path: GCS bucket storage path of raw data input
         :param project_id: GCP project id
-        :param pls_model: trained PLS model object used to predict penicillin concentration
+        :param pls_model_path: GCS bucket storage path of PLS model file
         :param current_time: datetime instance of the current timestamp dag is run at
         '''
         # Start spark session
-        spark = self.start_spark_session()
+        spark = DagFunctions.start_spark_session()
         logging.info("spark session created")
         
         # find most recent existing record in T_RAMAN_PREDICTION
+
         # gather all raman records produced in the last 20 minutes
         back_time = current_time - timedelta(minutes=5)
         current_ts = current_time.strftime("%Y-%m-%d %H:%M:%S")
@@ -415,6 +413,13 @@ class DagFunctions:
         logging.info(f"Calculated spectra derivative")
 
         # Apply model to predict penicillin concentration
+        storage_client = storage.Client()
+        bucket = storage_client.get_bucket(gcs_bucket)
+        blob = bucket.blob(pls_model_path)
+        with TemporaryFile() as temp_file:
+            blob.download_to_file(temp_file)
+            temp_file.seek(0)
+            pls_model = joblib.load(temp_file)
         scaler = StandardScaler()
         df_raman_preprocessed = scaler.fit_transform(df_raman_preprocessed)
         predicted_concentration = pls_model.predict(df_raman_preprocessed)

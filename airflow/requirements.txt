@@ -8,3 +8,5 @@ pyspark
 joblib
 scikit-learn
 chemotools
+requests
+pytz

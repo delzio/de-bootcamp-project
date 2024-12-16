@@ -15,31 +15,6 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     tar \
     && rm -rf /var/lib/apt/lists/*
 
-# Set env variables for Spark
-ENV SPARK_VERSION=3.5.2
-ENV HADOOP_VERSION=3
-
-# Install JDK for Spark
-RUN mkdir -p /opt/spark
-RUN wget -q https://download.java.net/java/GA/jdk11/9/GPL/openjdk-11.0.2_linux-x64_bin.tar.gz && \
-    tar -xzf openjdk-11.0.2_linux-x64_bin.tar.gz && \
-    mv jdk-11.0.2 /opt/spark && \
-    rm openjdk-11.0.2_linux-x64_bin.tar.gz
-
-# Install Apache Spark
-RUN wget -q https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz && \
-    tar -xf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz && \
-    mv spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION} /opt/spark && \
-    rm spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
-
-# Add installations to path
-ENV SPARK_HOME=/opt/spark/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
-ENV PATH=${SPARK_HOME}/bin:${PATH}
-ENV JAVA_HOME=/opt/spark/jdk-11.0.2
-ENV PATH=${JAVA_HOME}/bin:${PATH}
-# set spark localhost value in spark-env.sh file
-RUN cp $SPARK_HOME/conf/spark-env.sh.template $SPARK_HOME/conf/spark-env.sh && echo "SPARK_MASTER_HOST=127.0.0.1" >> $SPARK_HOME/conf/spark-env.sh
-
 # Install Google Cloud SDK
 ARG CLOUD_SDK_VERSION=468.0.0
 ENV GCLOUD_HOME=/home/google-cloud-sdk

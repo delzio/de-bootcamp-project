@@ -17,7 +17,7 @@ Biquery was used for data warehousing processed data. Table partitioning and clu
 
 Spark was used for complex data transformations
 
-Looker Studio was used to create the visualization dashboard
+Looker Studio was used to create the [visualization dashboard](#data-visualization)
 
 This project should be fully reproduceable through docker using the [Installation and Usage Instructions](#installation-and-usage-instructions) (it is recommended to follow these instructions using a VM hosted by GCP)
 
@@ -31,7 +31,7 @@ This project should be fully reproduceable through docker using the [Installatio
 ## Background
 Penicillin is a vital group of antibiotics used in the treatment of various bacterial infections. It is produced through fermentation of the Penicillium fungus and is later purified from these fungal cells and all other impurities. To understand the amount of Penicillin produced, samples are typically taken at several intervals throughout the manufacturing process. This sampling is invasive, leading to delays in manufacturing and increased risk of contaminations. Raman spectroscopy is a powerful analytical technique which can be used to analyze the composition of biological components in solution. It is becoming popular in biopharmaceutical production since it is non-invasive and allows for measurements to be taken in-process thereby eliminating the need for sampling. This technique relies on measuring the spectrum of light scattered through a solution to measure target product concentration and quality attributes. 
 
-The raw data used in this project includes 100 batches worth of processing data for the large-scale manufacutring of Penicillin. Each batch includes many records of data from both sample measurements as well as Raman sepctra readings throughout the manufacturing of the Penicillin product (for more info on the data set used please refer to [Data Sources](#data-sources) and [Acknowledgements](#acknowledgements)).
+The raw data used in this project includes 100 batches worth of processing data for the large-scale manufacutring of Penicillin. Each batch includes many records of data from both sample measurements as well as Raman sepctra readings throughout the manufacturing of the Insulin product (for more info on the data set used please refer to [Data Sources](#data-sources) and [Acknowledgements](#acknowledgements)).
 
 ## Project Description
 This project will focus specifically on the following columns from the 100_Batches_IndPenSim_V3.csv dataset:
@@ -43,16 +43,14 @@ This project will focus specifically on the following columns from the 100_Batch
 
 The goal of this project is to estimate the Penicillin concentration using only the Raman measurement data (from the 689-2089 nm wavelength columns) for each record (sampling point) and compare to the actual measured sample concentration (from the Penicillin concentration(P:g/L) column). The first 30 batches of the dataset will be used to train the model that will be used to calculate a Penicillin concentration. Each record from the final 30 batches will be ingested to the cloud in batch using airflow to simulate data being created in near real time. As each record is inserted, the estimated Penicillin concentration will be calculated by feeding the Raman measurement data to the model and the calculated result will be added to the dataset. The final feature data will be used to create a dashboard analyzing the accuracy of the model as well as the distribution of Insulin concentration between both sample measurements and model calculation results.
 
-## Project Structure
+## Project File Structure
 The project is organized into the following directories:
 
 0. `README.md`: Contains background and instructions for setting up and running the code
 1. `airflow`: Contains the python scripts used to create DAGs and transfer data to/from Google Cloud
-2. `data`: Stores raw and processed data files.
+2. `data`: Stores raw and processed data files
 3. `model`: Contains all code related to model development (adapted from code originally created by Shashank Gupta, Ricardo Flores, and Rakesh Bobbala - see [Acknowledgements](#acknowledgements) for model development)
-4. `terraform`: Contains the terraform code for building GCP resources required for the project
-5. `scripts`: Contains bash scripts that linux machine users can follow to build and start the project
-6. `lib`: Contains spark and hadoop jar fars needed to run spark locally
+4. `scripts`: Contains linux bash scripts which can be used to launch the project from a linux machine (installs software, creates GCP resources, starts airflow, stops airflow, destroys GCP resources)
 
 ## Requirements
 - Python 3.11
@@ -69,7 +67,7 @@ The project is organized into the following directories:
  - Cloud Storage API
  - BigQuery API
 
-2. Create a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute. View [How to SSH into VM section](#how-to-ssh-into-vm) to set up your local machine to log into the virtual machine you created. If you choose not to run this project with this vm setup, you can still follow the instructions but will need to install the required software (Docker and Terraform), build the docker images, and launch the airflow containers manually.
+2. Create a Debian e2-standard-4 virtual machine with 100GB boot disk provided by google cloud compute. View [How to SSH into VM section](#how-to-ssh-into-vm) to set up your local machine to log into the virtual machine you created.
 
 3. Create a Service Account with your desired name and description (from the hamburger icon go to IAM & Admin -> Service Accounts)
 
@@ -80,7 +78,7 @@ The project is organized into the following directories:
 6. Install git and SSH into the cloud compute virtual machine and clone this repository:
 ```bash
 sudo apt update && sudo apt install git
-git clone -b main --single-branch https://github.com/delzio/de-bootcamp-project.git
+git clone -b cloud-spark --single-branch https://github.com/delzio/de-bootcamp-project.git
 ```
 
 7. Create a file named gcp.json to store your Google crednetials using the following terminal commands (replace <path_to_project_home> with the path to this git repo you cloned to your machine e.g. ~/de-bootcamp-project/.google/credentials/gcp.json):
@@ -114,9 +112,9 @@ docker compose version
 terraform version
 ```
 
-13. Download the raw data as zip from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing). You can use something like the below command to copy from your local computer to VM:
+13. Download the raw data as zip from [Kaggle (https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing). You can follow the command template below to copy from your local computer to the VM:
 ```bash
-# Copy archive.zip to the raw folder, unzip it, and remove the old zip file (this may take a few tries but should work)
+# Copy archive.zip to the data/raw folder
 scp Downloads/archive.zip <username>@<vm name>:/home/<username>/de-bootcamp-project/data/raw
 ```
 
@@ -127,39 +125,39 @@ unzip file.zip
 rm archive.zip
 ```
 
-15. Confirm that csv file data exists in the following path (move to this path if not): <path_to_project_home>/data/raw/Mendeley_data/100_Batches_IndPenSim_V3.csv
+8. Confirm that csv file data exists in the following path (move to this path if not): <path_to_project_home>/data/raw/Mendeley_data/100_Batches_IndPenSim_V3.csv
 
-16. Move to the airflow folder and edit the .env_example file and replace the GCP env var values with the info from your GCP project and save as ".env" (make sure there are no added spaces in the variable names)
+9. Move to the airflow folder and edit the .env_example file and replace the env var values with the info from your GCP project and save the file as ".env" (make sure there are no added spaces in the variable names)
 
-17. Move back to project home path and run the 1_resource_setup.sh script to create your GCP resources
+10. Move back to project home path and run the 1_resource_setup.sh script to create your GCP resources and send files required for running spark jobs to your storage buckets (if you get a resource availability error during the creation of the Dataproc cluster, try changing the GCP region set at TF_VAR_region in your .env file, run the 4_resource_destroy.sh script, and try the 1_resource_setup.sh script again)
 ```bash
 bash ./scripts/1_resource_setup.sh
 ```
 
-18. Run the 2_airflow_start.sh script to start the airflow service and begin the data pipeline processes
+11. Run the 2_airflow_start.sh script to start the airflow service and begin the data pipeline processes
 ```bash
 bash ./scripts/2_airflow_start.sh
 ```
 
-19. Once the containers have finished launching, the data will immediately start being sent to your GCP GCS bucket and BigQuery dataset
+12. Once the containers have finished launching, the data will immediately start being sent to your GCS bucket and BigQuery dataset
 
-20. If interested, you can view the DAG executions from the Airflow UI (user: airflow, pw: airflow) at http://localhost:8092/ (you may need to forward port 8092 over to your local computer if running from a VM)
+13. If interested, you can view the DAG executions from the Airflow UI (user: airflow, pw: airflow) at http://localhost:8092/ (you may need to forward port 8092 over to your local computer)
 
-21. You can view progress of dags and their tasks along with any logs or error messages sent by the dags from here. You can also pause, play, and manually trigger the DAGS from here if you want to explore, but they should be setup to pull in all data and populate BigQuery tables with model predictions automatically.
+14. You can view progress of dags and their tasks along with any logs or error messages sent by the dags from here. You can also pause, play, and manually trigger the DAGS from here if you want to explore, but they should be setup to pull in all data and populate BigQuery tables with model predictions automatically.
 
-22. That's it! The first 30 batches of data should start flowing into your Google Cloud project in a few minutes and the final 70 batches of data will continuously be added via the DAGs until you shut down airflow
+15. That's it! The first 30 batches of data should start flowing into your Google Cloud project in a few minutes and the final 70 batches of data will continuously be added via the DAGs until you shut down airflow
 
-23. You can shut down airflow with
+16. You can shut down airflow with:
 ```bash
 bash ./scripts/3_airflow_stop.sh
 ```
 
-24. You can delete all of the GCP resources created for this project (Bucket and Dataset) with:
+17. You can delete all of the GCP resources created for this project (Bucket, Dataset, Cluster) with:
 ```bash
 bash ./scripts/4_resource_destroy.sh
 ```
 
-25. If you have any issues, you can open the Airflow UI and click on the dag tasks and check the logs to see error messages (most likely it is due to an incorrectly named environment parameter or missing credentials json)
+18. If you have any issues, you can open the Airflow UI and click on the dag tasks and check the logs to see error messages (most likely it is due to an incorrectly named environment parameter or missing credentials json)
 
 ## ETL Process
 1. The raw_data_ingestion_gcs_dag is used to extract the data from the raw csv file and store raw data as a series of partitioned parquet files in to the raw path in a GCS Bucket in the first task
@@ -186,6 +184,7 @@ bash ./scripts/4_resource_destroy.sh
 GCS:
 - Raw Parquet files have all data from the csv file with an added "id" column representing the row number each sample measurement is from
 - Processed Parquet files have only the relevant attribute data and ids with added artificial context columns (sample_ts and batch_number) to simulate real drug processing
+
 BigQuery:
 - T_SAMPLE_CONTEXT contains cleaned Penicillin sample concentration, ids, and context data from the processed parquet files partitioned by the sample timestamp (sample_ts) and clustered by the batch_number
 - T_RAMAN_CONTEXT contains cleaned raman context data and ids from the processed parquet files partitioned by the sample timestamp (sample_ts)
@@ -202,7 +201,7 @@ BigQuery:
 
 4. connect using external ip
 
-5. Create a file called config in ~/.ssh:
+5. Create a file named config in ~/.ssh and add the following:
 ```bash
 Host <gcp vm name>
     HostName <gcp vm external ip>
@@ -211,6 +210,7 @@ Host <gcp vm name>
 ```
 
 6. Can log on from your command line using "ssh <gcp vm name>" or from vs code using connect to host and selecting <gcp vm name>
+
 
 
 ## Author
@@ -232,4 +232,4 @@ limitations under the License.
 ## Acknowledgements
 - This project was inspired by [2024 Data Engineering Zoomcamp](https://datatalks.club/blog/data-engineering-zoomcamp.html) offered by DataTalks.Club.
 - The data used for this project was provided by [kaggle](https://www.kaggle.com/datasets/stephengoldie/big-databiopharmaceutical-manufacturing)
-- The model development for this project was inspired by [Shashank Gupta, Ricardo Flores, and Rakesh Bobbala](https://www.kaggle.com/code/wrecked22/regression-analysis)
+- The model development for this project was inspired by [Shashank Gupta, Ricardo Flores, and Rakesh Bobbala](https://www.kaggle.com/code/wrecked22/regression-analysis)				
